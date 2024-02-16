@@ -2,80 +2,78 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>A-Frame Scene with Enhanced Touch Gestures</title>
+    <title>A-Frame Scene with Object Orbit Component</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script>
-      AFRAME.registerComponent('enhanced-touch-gestures', {
-        schema: {
-          speed: {type: 'number', default: 1}, // Geschwindigkeit der Drehung
-          zoomSpeed: {type: 'number', default: 0.1}, // Geschwindigkeit des Zooms
-          minScale: {type: 'number', default: 1.0}, // Minimale Skalierung
-          maxScale: {type: 'number', default: 2.0} // Maximale Skalierung
-        },
-        init: function() {
-          this.startPos = null;
-          this.currentScale = 1;
-          const el = this.el;
-          const data = this.data;
-
-          el.addEventListener('touchstart', (event) => {
-            if (event.touches.length === 1) {
-              this.handleSingleTouchStart(event);
-            } else if (event.touches.length === 2) {
-              this.handlePinchStart(event);
-            }
-          }, false);
-
-          el.addEventListener('touchmove', (event) => {
-            if (event.touches.length === 1) {
-              this.handleSingleTouchMove(event);
-            } else if (event.touches.length === 2) {
-              this.handlePinchMove(event);
-            }
-          }, false);
-
-          el.addEventListener('touchend', (event) => {
-            this.startPos = null;
-          }, false);
-        },
-        handleSingleTouchStart: function(event) {
-          this.startPos = {x: event.touches[0].pageX, y: event.touches[0].pageY};
-        },
-        handleSingleTouchMove: function(event) {
-          if (!this.startPos) return;
-
-          const currentPos = {x: event.touches[0].pageX, y: event.touches[0].pageY};
-          const diffX = currentPos.x - this.startPos.x;
-          const diffY = currentPos.y - this.startPos.y;
-
-          this.startPos = currentPos;
-
-          let rotation = this.el.getAttribute('rotation');
-          rotation.y += diffX * this.data.speed;
-          rotation.x -= diffY * this.data.speed;
-          this.el.setAttribute('rotation', rotation);
-        },
-        handlePinchStart: function(event) {
-          this.pinchStartDistance = this.getDistance(event.touches[0], event.touches[1]);
-          this.initialScale = this.currentScale;
-        },
-        handlePinchMove: function(event) {
-          const currentDistance = this.getDistance(event.touches[0], event.touches[1]);
-          const scaleDifference = currentDistance / this.pinchStartDistance;
-          this.currentScale = Math.max(this.data.minScale, Math.min(this.data.maxScale, this.initialScale * scaleDifference));
-          this.el.setAttribute('scale', {x: this.currentScale, y: this.currentScale, z: this.currentScale});
-        },
-        getDistance: function(touch1, touch2) {
-          const dx = touch2.pageX - touch1.pageX;
-          const dy = touch2.pageY - touch1.pageY;
-          return Math.sqrt(dx * dx + dy * dy);
-        }
-      });
-    </script>
+  <script>
+    AFRAME.registerComponent('cursor-drag-rotate', {
+      schema: {
+        speed: {type: 'number', default: 1}, // Geschwindigkeit der Drehung
+        zoomSpeed: {type: 'number', default: 0.1}, // Geschwindigkeit des Zooms
+        minScale: {type: 'number', default: 1.0}, // Minimale Skalierung
+        maxScale: {type: 'number', default: 2.0} // Maximale Skalierung
+      },
+      init: function() {
+        this.isMouseDown = false;
+        this.isMouseOver = false;
+        this.startX = 0;
+        this.startY = 0;
+        this.lastClickTime = 0;
+        const el = this.el;
+        const data = this.data;
+        
+        el.addEventListener('mouseenter', () => this.isMouseOver = true);
+        el.addEventListener('mouseleave', () => this.isMouseOver = false);
+        
+        window.addEventListener('mousedown', (event) => {
+          if (this.isMouseOver) {
+            this.isMouseDown = true;
+            this.startX = event.clientX;
+            this.startY = event.clientY;
+          }
+        });
+        
+        window.addEventListener('mousemove', (event) => {
+          if (this.isMouseDown && this.isMouseOver) {
+            let diffX = event.clientX - this.startX;
+            let diffY = event.clientY - this.startY;
+            this.startX = event.clientX;
+            this.startY = event.clientY;
+            
+            let rotation = el.getAttribute('rotation');
+            rotation.y += diffX * data.speed;
+            rotation.x -= diffY * data.speed;
+            el.setAttribute('rotation', rotation);
+          }
+        });
+        
+        window.addEventListener('mouseup', () => this.isMouseDown = false);
+        
+        el.addEventListener('click', () => {
+          const currentTime = new Date().getTime();
+          if (currentTime - this.lastClickTime < 500) {
+            el.setAttribute('rotation', {x: 0, y: 0, z: 0});
+            el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
+          }
+          this.lastClickTime = currentTime;
+        });
+        
+        window.addEventListener('wheel', (event) => {
+          if (this.isMouseOver) {
+            let scale = el.getAttribute('scale');
+            let zoomFactor = event.deltaY * -data.zoomSpeed;
+            scale.x = Math.max(data.minScale, Math.min(data.maxScale, scale.x + zoomFactor));
+            scale.y = Math.max(data.minScale, Math.min(data.maxScale, scale.y + zoomFactor));
+            scale.z = Math.max(data.minScale, Math.min(data.maxScale, scale.z + zoomFactor));
+            el.setAttribute('scale', scale);
+          }
+        });
+      }
+    });
+  </script>
 </head>
 <body>
     <a-scene>
-      <a-box position="0 1.5 -5" rotation="0 0 0" color="#4CC3D9" enhanced-touch-gestures="speed: 0.1; zoomSpeed: 0.05; minScale: 1.0; maxScale: 2.0"></a-box>
+      <a-box position="0 1.5 -5" rotation="0 0 0" color="#4CC3D9" cursor-drag-rotate="speed: 0.1; zoomSpeed: 0.05; minScale: 1.0; maxScale: 2.0"></a-box>
         <a-entity camera look-controls="false" position="0 1.6 0">
           <a-cursor id="cursor" color="red" fuse="false"></a-cursor>
         </a-entity>
