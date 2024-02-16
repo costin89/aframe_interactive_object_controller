@@ -19,13 +19,13 @@
         this.startY = 0;
         this.lastTouchTime = 0;
         this.pinchDistance = null;
+        this.lastClickTime = 0; // Zeit des letzten Klicks für Doppelklick-Erkennung
         const el = this.el;
         const data = this.data;
         
         el.addEventListener('mouseenter', () => this.isMouseOver = true);
         el.addEventListener('mouseleave', () => this.isMouseOver = false);
         
-        // Maus-Events
         window.addEventListener('mousedown', (event) => {
           if (this.isMouseOver) {
             this.isMouseDown = true;
@@ -49,10 +49,11 @@
         });
         
         window.addEventListener('mouseup', () => this.isMouseDown = false);
-
+        
+        // Doppelklick zum Zurücksetzen
         el.addEventListener('click', () => {
           const currentTime = new Date().getTime();
-          if (currentTime - this.lastClickTime < 500) {
+          if (currentTime - this.lastClickTime < 500) { // Weniger als 500ms zwischen den Klicks
             el.setAttribute('rotation', {x: 0, y: 0, z: 0});
             el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
           }
@@ -69,7 +70,7 @@
             el.setAttribute('scale', scale);
           }
         });
-        
+          
         // Touch-Events
         if (AFRAME.utils.device.isMobile()) {
           window.addEventListener('touchstart', (event) => {
