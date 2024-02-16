@@ -4,126 +4,77 @@
     <meta charset="utf-8">
     <title>A-Frame Scene with Object Orbit Component</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <style>
-        a-scene, a-box {
-            touch-action: none;
-        }
-    </style>
-<script>
-  AFRAME.registerComponent('interactive-controls', {
-    schema: {
-      speed: {type: 'number', default: 1},
-      zoomSpeed: {type: 'number', default: 0.01},
-      minScale: {type: 'number', default: 0.5},
-      maxScale: {type: 'number', default: 2.0}
-    },
-    init: function() {
-      // Initialisieren von Zuständen und Variablen
-      this.isMouseDown = false;
-      this.lastPosition = {x: 0, y: 0};
-      this.lastTouchDistance = null;
-
-      this.bindMethods();
-    },
-    bindMethods: function() {
-      const el = this.el;
-      const data = this.data;
-
-      // Maus-Events
-      window.addEventListener('mousedown', this.onMouseDown.bind(this));
-      window.addEventListener('mousemove', this.onMouseMove.bind(this));
-      window.addEventListener('mouseup', this.onMouseUp.bind(this));
-
-      // Touch-Events
-      el.addEventListener('touchstart', this.onTouchStart.bind(this), {passive: true});
-      el.addEventListener('touchmove', this.onTouchMove.bind(this), {passive: true});
-      el.addEventListener('touchend', this.onTouchEnd.bind(this));
-
-      // Click zum Ermitteln von Doppelklick
-      el.addEventListener('click', this.onClick.bind(this));
-
-      // Scrollrad zum Zoomen
-      window.addEventListener('wheel', this.onWheel.bind(this));
-    },
-    onMouseDown: function(event) {
-      this.isMouseDown = true;
-      this.lastPosition.x = event.clientX;
-      this.lastPosition.y = event.clientY;
-    },
-    onMouseMove: function(event) {
-      if (!this.isMouseDown) return;
-      this.rotateObject(event.clientX, event.clientY);
-    },
-    onMouseUp: function() {
-      this.isMouseDown = false;
-    },
-    onTouchStart: function(event) {
-      if (event.touches.length === 1) {
-        this.lastPosition.x = event.touches[0].clientX;
-        this.lastPosition.y = event.touches[0].clientY;
-      } else if (event.touches.length === 2) {
-        this.lastTouchDistance = this.getTouchDistance(event.touches);
+  <script>
+    AFRAME.registerComponent('cursor-drag-rotate', {
+      schema: {
+        speed: {type: 'number', default: 1}, // Geschwindigkeit der Drehung
+        zoomSpeed: {type: 'number', default: 0.1}, // Geschwindigkeit des Zooms
+        minScale: {type: 'number', default: 1.0}, // Minimale Skalierung
+        maxScale: {type: 'number', default: 2.0} // Maximale Skalierung
+      },
+      init: function() {
+        this.isMouseDown = false;
+        this.isMouseOver = false;
+        this.startX = 0;
+        this.startY = 0;
+        this.lastClickTime = 0;
+        const el = this.el;
+        const data = this.data;
+        
+        el.addEventListener('mouseenter', () => this.isMouseOver = true);
+        el.addEventListener('mouseleave', () => this.isMouseOver = false);
+        
+        window.addEventListener('mousedown', (event) => {
+          if (this.isMouseOver) {
+            this.isMouseDown = true;
+            this.startX = event.clientX;
+            this.startY = event.clientY;
+          }
+        });
+        
+        window.addEventListener('mousemove', (event) => {
+          if (this.isMouseDown && this.isMouseOver) {
+            let diffX = event.clientX - this.startX;
+            let diffY = event.clientY - this.startY;
+            this.startX = event.clientX;
+            this.startY = event.clientY;
+            
+            let rotation = el.getAttribute('rotation');
+            rotation.y += diffX * data.speed;
+            rotation.x -= diffY * data.speed;
+            el.setAttribute('rotation', rotation);
+          }
+        });
+        
+        window.addEventListener('mouseup', () => this.isMouseDown = false);
+        
+        el.addEventListener('click', () => {
+          const currentTime = new Date().getTime();
+          if (currentTime - this.lastClickTime < 500) {
+            el.setAttribute('rotation', {x: 0, y: 0, z: 0});
+            el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
+          }
+          this.lastClickTime = currentTime;
+        });
+        
+        window.addEventListener('wheel', (event) => {
+          if (this.isMouseOver) {
+            let scale = el.getAttribute('scale');
+            let zoomFactor = event.deltaY * -data.zoomSpeed;
+            scale.x = Math.max(data.minScale, Math.min(data.maxScale, scale.x + zoomFactor));
+            scale.y = Math.max(data.minScale, Math.min(data.maxScale, scale.y + zoomFactor));
+            scale.z = Math.max(data.minScale, Math.min(data.maxScale, scale.z + zoomFactor));
+            el.setAttribute('scale', scale);
+          }
+        });
       }
-    },
-    onTouchMove: function(event) {
-      if (event.touches.length === 1) {
-        this.rotateObject(event.touches[0].clientX, event.touches[0].clientY);
-      } else if (event.touches.length === 2) {
-        const currentDistance = this.getTouchDistance(event.touches);
-        this.scaleObject(currentDistance);
-      }
-    },
-    onTouchEnd: function() {
-      this.lastTouchDistance = null;
-    },
-    onClick: function() {
-      const currentTime = new Date().getTime();
-      if (currentTime - this.lastClickTime < 500) {
-        this.el.setAttribute('rotation', {x: 0, y: 0, z: 0});
-      }
-      this.lastClickTime = currentTime;
-    },
-    onWheel: function(event) {
-      let scale = this.el.getAttribute('scale');
-      let zoomFactor = event.deltaY * -this.data.zoomSpeed;
-      this.applyScale(scale.x + zoomFactor, scale.y + zoomFactor, scale.z + zoomFactor);
-    },
-    rotateObject: function(clientX, clientY) {
-      let diffX = clientX - this.lastPosition.x;
-      let diffY = clientY - this.lastPosition.y;
-      this.lastPosition.x = clientX;
-      this.lastPosition.y = clientY;
-
-      let rotation = this.el.getAttribute('rotation');
-      rotation.y += diffX * this.data.speed;
-      rotation.x -= diffY * this.data.speed;
-      this.el.setAttribute('rotation', rotation);
-    },
-    scaleObject: function(currentDistance) {
-      if (this.lastTouchDistance === null) return;
-      let scale = this.el.getAttribute('scale');
-      let scaleChange = currentDistance / this.lastTouchDistance;
-      this.applyScale(scale.x * scaleChange, scale.y * scaleChange, scale.z * scaleChange);
-    },
-    applyScale: function(x, y, z) {
-      const {minScale, maxScale} = this.data;
-      x = Math.max(minScale, Math.min(maxScale, x));
-      y = Math.max(minScale, Math.min(maxScale, y));
-      z = Math.max(minScale, Math.min(maxScale, z));
-      this.el.setAttribute('scale', {x, y, z});
-    },
-    getTouchDistance: function(touches) {
-      const dx = touches[0].clientX - touches[1].clientX;
-      const dy = touches[0].clientY - touches[1].clientY;
-      return Math.sqrt(dx * dx + dy * dy);
-    }
-  });
-</script>
+    });
+  </script>
 </head>
 <body>
     <a-scene>
-        <a-box position="0 1.5 -5" rotation="0 0 0" color="#4CC3D9" interactive-controls="speed: 0.1; zoomSpeed: 0.005; minScale: 0.5; maxScale: 2.0"></a-box>
-        <a-entity camera look-controls="false" touchEnabled="true" mouseEnabled="true" position="0 1.6 0">
+      <a-box position="0 1.5 -5" rotation="0 0 0" color="#4CC3D9" cursor-drag-rotate="speed: 0.1; zoomSpeed: 0.05; minScale: 1.0; maxScale: 2.0"></a-box>
+        <a-entity camera look-controls="false" position="0 1.6 0">
           <a-cursor id="cursor" color="red" fuse="false"></a-cursor>
         </a-entity>
     </a-scene>
