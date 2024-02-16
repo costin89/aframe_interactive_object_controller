@@ -17,9 +17,7 @@
         this.isMouseOver = false;
         this.startX = 0;
         this.startY = 0;
-        this.lastTouchTime = 0;
         this.pinchDistance = null;
-        this.lastClickTime = 0; // Zeit des letzten Klicks für Doppelklick-Erkennung
         const el = this.el;
         const data = this.data;
         
@@ -50,14 +48,21 @@
         
         window.addEventListener('mouseup', () => this.isMouseDown = false);
         
-        // Doppelklick zum Zurücksetzen
-        el.addEventListener('click', () => {
-          const currentTime = new Date().getTime();
-          if (currentTime - this.lastClickTime < 500) { // Weniger als 500ms zwischen den Klicks
-            el.setAttribute('rotation', {x: 0, y: 0, z: 0});
-            el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
+        // Doppelklick zum Zurücksetzen (mit 'dblclick')
+        el.addEventListener('dblclick', () => {
+          el.setAttribute('rotation', {x: 0, y: 0, z: 0});
+          el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
+        });
+        
+        window.addEventListener('wheel', (event) => {
+          if (this.isMouseOver) {
+            let scale = el.getAttribute('scale');
+            let zoomFactor = event.deltaY * -data.zoomSpeed;
+            scale.x = Math.max(data.minScale, Math.min(data.maxScale, scale.x + zoomFactor));
+            scale.y = Math.max(data.minScale, Math.min(data.maxScale, scale.y + zoomFactor));
+            scale.z = Math.max(data.minScale, Math.min(data.maxScale, scale.z + zoomFactor));
+            el.setAttribute('scale', scale);
           }
-          this.lastClickTime = currentTime;
         });
         
         window.addEventListener('wheel', (event) => {
