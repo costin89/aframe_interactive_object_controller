@@ -5,76 +5,106 @@
     <title>A-Frame Scene with Object Orbit Component</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script>
-    AFRAME.registerComponent('cursor-drag-rotate', {
+    AFRAME.registerComponent('interactive-controls', {
       schema: {
-        speed: {type: 'number', default: 1}, // Geschwindigkeit der Drehung
-        zoomSpeed: {type: 'number', default: 0.1}, // Geschwindigkeit des Zooms
-        minScale: {type: 'number', default: 1.0}, // Minimale Skalierung
-        maxScale: {type: 'number', default: 2.0} // Maximale Skalierung
+        speed: {type: 'number', default: 1},
+        zoomSpeed: {type: 'number', default: 0.1},
+        minScale: {type: 'number', default: 0.5},
+        maxScale: {type: 'number', default: 2.0}
       },
       init: function() {
-        this.isMouseDown = false;
-        this.isMouseOver = false;
-        this.startX = 0;
-        this.startY = 0;
-        this.lastClickTime = 0;
+        this.lastTouchTime = 0;
+        this.touchStartPositions = {};
+        this.isPinching = false;
+        this.previousPinchDistance = 0;
         const el = this.el;
         const data = this.data;
         
-        el.addEventListener('mouseenter', () => this.isMouseOver = true);
-        el.addEventListener('mouseleave', () => this.isMouseOver = false);
+        el.addEventListener('touchstart', (event) => this.handleTouchStart(event));
+        el.addEventListener('touchmove', (event) => this.handleTouchMove(event));
+        el.addEventListener('touchend', (event) => this.handleTouchEnd(event));
+        window.addEventListener('wheel', (event) => this.handleWheel(event));
+      },
+      handleTouchStart: function(event) {
+        // Doppel-Tap-Erkennung
+        const currentTime = new Date().getTime();
+        if (currentTime - this.lastTouchTime < 300) {
+          el.setAttribute('rotation', {x: 0, y: 0, z: 0});
+          this.lastTouchTime = 0; // Verhindert wiederholte Resets bei mehrfachen Taps
+        } else {
+          this.lastTouchTime = currentTime;
+        }
         
-        window.addEventListener('mousedown', (event) => {
-          if (this.isMouseOver) {
-            this.isMouseDown = true;
-            this.startX = event.clientX;
-            this.startY = event.clientY;
-          }
-        });
-        
-        window.addEventListener('mousemove', (event) => {
-          if (this.isMouseDown && this.isMouseOver) {
-            let diffX = event.clientX - this.startX;
-            let diffY = event.clientY - this.startY;
-            this.startX = event.clientX;
-            this.startY = event.clientY;
-            
-            let rotation = el.getAttribute('rotation');
-            rotation.y += diffX * data.speed;
-            rotation.x -= diffY * data.speed;
-            el.setAttribute('rotation', rotation);
-          }
-        });
-        
-        window.addEventListener('mouseup', () => this.isMouseDown = false);
-        
-        el.addEventListener('click', () => {
-          const currentTime = new Date().getTime();
-          if (currentTime - this.lastClickTime < 500) {
-            el.setAttribute('rotation', {x: 0, y: 0, z: 0});
-            el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
-          }
-          this.lastClickTime = currentTime;
-        });
-        
-        window.addEventListener('wheel', (event) => {
-          if (this.isMouseOver) {
-            let scale = el.getAttribute('scale');
-            let zoomFactor = event.deltaY * -data.zoomSpeed;
-            scale.x = Math.max(data.minScale, Math.min(data.maxScale, scale.x + zoomFactor));
-            scale.y = Math.max(data.minScale, Math.min(data.maxScale, scale.y + zoomFactor));
-            scale.z = Math.max(data.minScale, Math.min(data.maxScale, scale.z + zoomFactor));
-            el.setAttribute('scale', scale);
-          }
-        });
+        if (event.touches.length === 1) {
+          // Einfacher Touch (Drehen)
+          this.touchStartPositions.x = event.touches[0].pageX;
+          this.touchStartPositions.y = event.touches[0].pageY;
+        } else if (event.touches.length === 2) {
+          // Pinch-Geste (Zoom)
+          this.isPinching = true;
+          this.previousPinchDistance = this.getPinchDistance(event.touches[0], event.touches[1]);
+        }
+      },
+      handleTouchMove: function(event) {
+        if (event.touches.length === 1 && !this.isPinching) {
+          // Einfacher Touch zum Drehen
+          let diffX = event.touches[0].pageX - this.touchStartPositions.x;
+          let diffY = event.touches[0].pageY - this.touchStartPositions.y;
+          this.touchStartPositions.x = event.touches[0].pageX;
+          this.touchStartPositions.y = event.touches[0].pageY;
+          
+          let rotation = this.el.getAttribute('rotation');
+          rotation.y += diffX * this.data.speed;
+          rotation.x -= diffY * this.data.speed;
+          this.el.setAttribute('rotation', rotation);
+        } else if (event.touches.length === 2) {
+          // Pinch zum Zoomen
+          let currentPinchDistance = this.getPinchDistance(event.touches[0], event.touches[1]);
+          let pinchDelta = currentPinchDistance - this.previousPinchDistance;
+          this.previousPinchDistance = currentPinchDistance;
+          
+          let scale = this.el.getAttribute('scale');
+          let zoomFactor = pinchDelta * this.data.zoomSpeed;
+          scale.x += zoomFactor;
+          scale.y += zoomFactor;
+          scale.z += zoomFactor;
+          
+          // Begrenzung der Skalierung
+          scale.x = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.x));
+          scale.y = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.y));
+          scale.z = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.z));
+          
+          this.el.setAttribute('scale', scale);
+        }
+      },
+      handleTouchEnd: function(event) {
+        if (event.touches.length < 2) {
+          // Beendet Pinch-Geste
+          this.isPinching = false;
+        }
+      },
+      handleWheel: function(event) {
+        if (this.isMouseOver) {
+          let scale = this.el.getAttribute('scale');
+          let zoomFactor = event.deltaY * -this.data.zoomSpeed;
+          scale.x = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.x + zoomFactor));
+          scale.y = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.y + zoomFactor));
+          scale.z = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.z + zoomFactor));
+          this.el.setAttribute('scale', scale);
+        }
+      },
+      getPinchDistance: function(touch1, touch2) {
+        let xDiff = touch2.pageX - touch1.pageX;
+        let yDiff = touch2.pageY - touch1.pageY;
+        return Math.sqrt(xDiff * xDiff + yDiff * yDiff);
       }
     });
   </script>
 </head>
 <body>
     <a-scene>
-      <a-box position="0 1.5 -5" rotation="0 0 0" color="#4CC3D9" cursor-drag-rotate="speed: 0.1; zoomSpeed: 0.05; minScale: 1.0; maxScale: 2.0"></a-box>
-        <a-entity camera look-controls="false" position="0 1.6 0">
+      <a-box position="0 1.5 -5" rotation="0 0 0" color="#4CC3D9" interactive-controls="speed: 0.05; zoomSpeed: 0.0005; minScale: 0.5; maxScale: 2.0"></a-box>
+      <a-entity camera look-controls="false" position="0 1.6 0">
           <a-cursor id="cursor" color="red" fuse="false"></a-cursor>
         </a-entity>
     </a-scene>
