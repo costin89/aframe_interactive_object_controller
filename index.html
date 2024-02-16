@@ -17,13 +17,15 @@
         this.isMouseOver = false;
         this.startX = 0;
         this.startY = 0;
-        this.lastClickTime = 0;
+        this.lastTouchTime = 0;
+        this.pinchDistance = null;
         const el = this.el;
         const data = this.data;
         
         el.addEventListener('mouseenter', () => this.isMouseOver = true);
         el.addEventListener('mouseleave', () => this.isMouseOver = false);
         
+        // Maus-Events
         window.addEventListener('mousedown', (event) => {
           if (this.isMouseOver) {
             this.isMouseDown = true;
@@ -48,15 +50,6 @@
         
         window.addEventListener('mouseup', () => this.isMouseDown = false);
         
-        el.addEventListener('click', () => {
-          const currentTime = new Date().getTime();
-          if (currentTime - this.lastClickTime < 500) {
-            el.setAttribute('rotation', {x: 0, y: 0, z: 0});
-            el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
-          }
-          this.lastClickTime = currentTime;
-        });
-        
         window.addEventListener('wheel', (event) => {
           if (this.isMouseOver) {
             let scale = el.getAttribute('scale');
@@ -67,19 +60,34 @@
             el.setAttribute('scale', scale);
           }
         });
-
-        // Touch-Events nur auf Mobilgeräten aktivieren
+        
+        // Touch-Events
         if (AFRAME.utils.device.isMobile()) {
           window.addEventListener('touchstart', (event) => {
-            if (this.isMouseOver) {
+            const now = new Date().getTime();
+            const timeSinceLastTouch = now - this.lastTouchTime;
+            
+            if (timeSinceLastTouch < 300 && event.touches.length === 1) {
+              // Doppel-Tap
+              el.setAttribute('rotation', {x: 0, y: 0, z: 0});
+              el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
+            }
+            
+            if (event.touches.length === 1) {
               this.isMouseDown = true;
               this.startX = event.touches[0].clientX;
               this.startY = event.touches[0].clientY;
+            } else if (event.touches.length === 2) {
+              // Pinch Start
+              this.pinchDistance = this.getDistance(event.touches[0], event.touches[1]);
+              this.isMouseDown = false; // Deaktiviere Drag während des Pinch
             }
+            
+            this.lastTouchTime = now;
           }, {passive: true});
           
           window.addEventListener('touchmove', (event) => {
-            if (this.isMouseDown && this.isMouseOver) {
+            if (this.isMouseDown && this.isMouseOver && event.touches.length === 1) {
               let diffX = event.touches[0].clientX - this.startX;
               let diffY = event.touches[0].clientY - this.startY;
               this.startX = event.touches[0].clientX;
@@ -89,11 +97,31 @@
               rotation.y += diffX * data.speed;
               rotation.x -= diffY * data.speed;
               el.setAttribute('rotation', rotation);
+            } else if (event.touches.length === 2) {
+              // Pinch Bewegung
+              let currentPinchDistance = this.getDistance(event.touches[0], event.touches[1]);
+              let diff = currentPinchDistance - this.pinchDistance;
+              this.pinchDistance = currentPinchDistance;
+              
+              let scale = el.getAttribute('scale');
+              let zoomFactor = diff * data.zoomSpeed * 0.01;
+              scale.x = Math.max(data.minScale, Math.min(data.maxScale, scale.x + zoomFactor));
+              scale.y = Math.max(data.minScale, Math.min(data.maxScale, scale.y + zoomFactor));
+              scale.z = Math.max(data.minScale, Math.min(data.maxScale, scale.z + zoomFactor));
+              el.setAttribute('scale', scale);
             }
           }, {passive: true});
           
-          window.addEventListener('touchend', () => this.isMouseDown = false);
+          window.addEventListener('touchend', () => {
+            this.isMouseDown = false;
+            this.pinchDistance = null;
+          });
         }
+      },
+      getDistance: function(touch1, touch2) {
+        const dx = touch1.clientX - touch2.clientX;
+        const dy = touch1.clientY - touch2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
       }
     });
   </script>
