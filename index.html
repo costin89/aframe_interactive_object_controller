@@ -14,9 +14,11 @@
       },
       init: function() {
         this.isMouseDown = false;
+        this.isTouching = false;
         this.isMouseOver = false;
         this.startX = 0;
         this.startY = 0;
+        this.lastTouchDistance = null;
         this.lastClickTime = 0;
         const el = this.el;
         const data = this.data;
@@ -24,6 +26,7 @@
         el.addEventListener('mouseenter', () => this.isMouseOver = true);
         el.addEventListener('mouseleave', () => this.isMouseOver = false);
         
+        // Maus-Events
         window.addEventListener('mousedown', (event) => {
           if (this.isMouseOver) {
             this.isMouseDown = true;
@@ -34,39 +37,76 @@
         
         window.addEventListener('mousemove', (event) => {
           if (this.isMouseDown && this.isMouseOver) {
-            let diffX = event.clientX - this.startX;
-            let diffY = event.clientY - this.startY;
-            this.startX = event.clientX;
-            this.startY = event.clientY;
-            
-            let rotation = el.getAttribute('rotation');
-            rotation.y += diffX * data.speed;
-            rotation.x -= diffY * data.speed;
-            el.setAttribute('rotation', rotation);
+            this.handleMovement(event.clientX, event.clientY);
           }
         });
         
         window.addEventListener('mouseup', () => this.isMouseDown = false);
         
-        el.addEventListener('click', () => {
-          const currentTime = new Date().getTime();
-          if (currentTime - this.lastClickTime < 500) {
-            el.setAttribute('rotation', {x: 0, y: 0, z: 0});
-            el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
+        // Touch-Events
+        el.addEventListener('touchstart', (event) => {
+          if (event.touches.length === 1) {
+            this.isTouching = true;
+            this.startX = event.touches[0].clientX;
+            this.startY = event.touches[0].clientY;
+          } else if (event.touches.length === 2) {
+            this.lastTouchDistance = this.getDistance(event.touches[0], event.touches[1]);
           }
-          this.lastClickTime = currentTime;
+        }, {passive: true});
+        
+        el.addEventListener('touchmove', (event) => {
+          if (this.isTouching && event.touches.length === 1) {
+            this.handleMovement(event.touches[0].clientX, event.touches[0].clientY);
+          } else if (event.touches.length === 2) {
+            const currentDistance = this.getDistance(event.touches[0], event.touches[1]);
+            if (this.lastTouchDistance !== null) {
+              let scaleChange = (currentDistance - this.lastTouchDistance) * data.zoomSpeed * 0.01;
+              this.handleZoom(scaleChange);
+            }
+            this.lastTouchDistance = currentDistance;
+          }
+          event.preventDefault();
+        }, {passive: false});
+        
+        el.addEventListener('touchend', () => {
+          this.isTouching = false;
+          this.lastTouchDistance = null;
         });
         
+        // Zoom-Funktionalität mit dem Mausrad
         window.addEventListener('wheel', (event) => {
           if (this.isMouseOver) {
-            let scale = el.getAttribute('scale');
             let zoomFactor = event.deltaY * -data.zoomSpeed;
-            scale.x = Math.max(data.minScale, Math.min(data.maxScale, scale.x + zoomFactor));
-            scale.y = Math.max(data.minScale, Math.min(data.maxScale, scale.y + zoomFactor));
-            scale.z = Math.max(data.minScale, Math.min(data.maxScale, scale.z + zoomFactor));
-            el.setAttribute('scale', scale);
+            this.handleZoom(zoomFactor);
           }
         });
+
+        // Hilfsfunktionen
+        this.handleMovement = (clientX, clientY) => {
+          let diffX = clientX - this.startX;
+          let diffY = clientY - this.startY;
+          this.startX = clientX;
+          this.startY = clientY;
+          
+          let rotation = el.getAttribute('rotation');
+          rotation.y += diffX * data.speed;
+          rotation.x -= diffY * data.speed;
+          el.setAttribute('rotation', rotation);
+        };
+
+        this.handleZoom = (zoomFactor) => {
+          let scale = el.getAttribute('scale');
+          scale.x = Math.max(data.minScale, Math.min(data.maxScale, scale.x + zoomFactor));
+          scale.y = Math.max(data.minScale, Math.min(data.maxScale, scale.y + zoomFactor));
+          scale.z = Math.max(data.minScale, Math.min(data.maxScale, scale.z + zoomFactor));
+          el.setAttribute('scale', scale);
+        };
+
+        this.getDistance = (touch1, touch2) => {
+          const dx = touch1.clientX - touch2.clientX;
+          const dy = touch1.clientY - touch2.clientY;
+          return Math.sqrt(dx * dx + dy * dy);
+        };
       }
     });
   </script>
