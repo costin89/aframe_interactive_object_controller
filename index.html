@@ -128,6 +128,30 @@
         return Math.sqrt(dx * dx + dy * dy);
       }
     });
+
+      document.addEventListener('DOMContentLoaded', () => {
+  const sceneEl = document.querySelector('a-scene');
+  if (sceneEl && sceneEl.canvas) {
+    // Direkt nachdem das Canvas verfügbar ist
+    addDblClickEventListener(sceneEl.canvas);
+  } else {
+    // Warten auf das 'loaded' Event, falls das Canvas noch nicht initialisiert wurde
+    sceneEl.addEventListener('loaded', () => {
+      addDblClickEventListener(sceneEl.canvas);
+    });
+  }
+});
+
+function addDblClickEventListener(canvas) {
+  canvas.addEventListener('dblclick', () => {
+    const el = document.querySelector('[cursor-drag-rotate]'); // Stellt sicher, dass du das richtige Element auswählst
+    if (el) {
+      el.setAttribute('rotation', {x: 0, y: 0, z: 0});
+      el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
+    }
+  });
+}
+
   </script>
 </head>
 <body>
