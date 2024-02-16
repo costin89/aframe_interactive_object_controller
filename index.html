@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>A-Frame Scene with Object Orbit Component</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script>
+    AFRAME.registerComponent('interactive-controls', {
+      schema: {
+        speed: {type: 'number', default: 1},
+        zoomSpeed: {type: 'number', default: 0.1},
+        minScale: {type: 'number', default: 1.0},
+        maxScale: {type: 'number', default: 2.0}
+      },
+      init: function() {
+        this.isMouseDown = false;
+        this.isTouching = false;
+        this.lastPosition = {x: 0, y: 0};
+        this.lastTouchDistance = null;
+        const el = this.el;
+        const data = this.data;
+        
+        this.handleMouseDown = this.handleMouseDown.bind(this);
+        this.handleMouseMove = this.handleMouseMove.bind(this);
+        this.handleMouseUp = this.handleMouseUp.bind(this);
+        this.handleClick = this.handleClick.bind(this);
+        this.handleWheel = this.handleWheel.bind(this);
+        this.handleTouchStart = this.handleTouchStart.bind(this);
+        this.handleTouchMove = this.handleTouchMove.bind(this);
+        this.handleTouchEnd = this.handleTouchEnd.bind(this);
+        
+        // Maus-Ereignisse
+        window.addEventListener('mousedown', this.handleMouseDown);
+        window.addEventListener('mousemove', this.handleMouseMove);
+        window.addEventListener('mouseup', this.handleMouseUp);
+        el.addEventListener('click', this.handleClick);
+        window.addEventListener('wheel', this.handleWheel);
+        
+        // Touch-Ereignisse
+        el.addEventListener('touchstart', this.handleTouchStart);
+        window.addEventListener('touchmove', this.handleTouchMove);
+        window.addEventListener('touchend', this.handleTouchEnd);
+      },
+      remove: function() {
+        // Bereinigen der Event Listener bei Entfernung der Komponente
+        window.removeEventListener('mousedown', this.handleMouseDown);
+        window.removeEventListener('mousemove', this.handleMouseMove);
+        window.removeEventListener('mouseup', this.handleMouseUp);
+        this.el.removeEventListener('click', this.handleClick);
+        window.removeEventListener('wheel', this.handleWheel);
+        
+        this.el.removeEventListener('touchstart', this.handleTouchStart);
+        window.removeEventListener('touchmove', this.handleTouchMove);
+        window.removeEventListener('touchend', this.handleTouchEnd);
+      },
+      handleMouseDown: function(event) {
+        this.isMouseDown = true;
+        this.lastPosition.x = event.clientX;
+        this.lastPosition.y = event.clientY;
+      },
+      handleMouseMove: function(event) {
+        if (this.isMouseDown) {
+          let diffX = event.clientX - this.lastPosition.x;
+          let diffY = event.clientY - this.lastPosition.y;
+          this.lastPosition.x = event.clientX;
+          this.lastPosition.y = event.clientY;
+          
+          this.rotateObject(diffX, diffY);
+        }
+      },
+      handleMouseUp: function() {
+        this.isMouseDown = false;
+      },
+      handleClick: function(event) {
+        const currentTime = new Date().getTime();
+        if (currentTime - this.lastClickTime < 500) {
+          this.el.setAttribute('rotation', {x: 0, y: 0, z: 0});
+        }
+        this.lastClickTime = currentTime;
+      },
+      handleWheel: function(event) {
+        if (this.isTouching) return; // Verhindern von Zoom während Touch-Interaktion
+        let scaleChange = event.deltaY * -this.data.zoomSpeed;
+        this.scaleObject(scaleChange, scaleChange, scaleChange);
+      },
+      handleTouchStart: function(event) {
+        if (event.touches.length === 1) {
+          this.isTouching = true;
+          this.lastPosition.x = event.touches[0].clientX;
+          this.lastPosition.y = event.touches[0].clientY;
+        } else if (event.touches.length === 2) {
+          this.lastTouchDistance = this.getTouchDistance(event.touches);
+        }
+      },
+      handleTouchMove: function(event) {
+        if (event.touches.length === 1 && this.isTouching) {
+          let diffX = event.touches[0].clientX - this.lastPosition.x;
+          let diffY = event.touches[0].clientY - this.lastPosition.y;
+          this.lastPosition.x = event.touches[0].clientX;
+          this.lastPosition.y = event.touches[0].clientY;
+          
+          this.rotateObject(diffX, diffY);
+        } else if (event.touches.length === 2) {
+          let currentDistance = this.getTouchDistance(event.touches);
+          if (this.lastTouchDistance !== null) {
+            let scaleChange = currentDistance - this.lastTouchDistance;
+            this.scaleObject(scaleChange * this.data.zoomSpeed, scaleChange * this.data.zoomSpeed, scaleChange * this.data.zoomSpeed);
+          }
+          this.lastTouchDistance = currentDistance;
+        }
+      },
+      handleTouchEnd: function(event) {
+        if (event.touches.length < 1) {
+          this.isTouching = false;
+          this.lastTouchDistance = null;
+        }
+      },
+      rotateObject: function(diffX, diffY) {
+        let rotation = this.el.getAttribute('rotation');
+        rotation.y += diffX * this.data.speed;
+        rotation.x -= diffY * this.data.speed; // Invertierung für intuitive Rotation
+        this.el.setAttribute('rotation', rotation);
+      },
+      scaleObject: function(scaleX, scaleY, scaleZ) {
+        let scale = this.el.getAttribute('scale');
+        scale.x = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.x + scaleX));
+        scale.y = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.y + scaleY));
+        scale.z = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.z + scaleZ));
+        this.el.setAttribute('scale', scale);
+      },
+      getTouchDistance: function(touches) {
+        let dx = touches[0].pageX - touches[1].pageX;
+        let dy = touches[0].pageY - touches[1].pageY;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+    });
+  </script>
+</head>
+<body>
+    <a-scene>
+      <a-box position="0 1.5 -5" rotation="0 0 0" color="#4CC3D9" interactive-controls="speed: 0.1; zoomSpeed: 0.05; minScale: 1.0; maxScale: 2.0"></a-box>
+        <a-entity camera look-controls="false" position="0 1.6 0">
+          <a-cursor id="cursor" color="red" fuse="false"></a-cursor>
+        </a-entity>
+    </a-scene>
+</body>
+</html>
