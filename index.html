@@ -4,75 +4,99 @@
     <meta charset="utf-8">
     <title>A-Frame Scene with Object Orbit Component</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script>
-  AFRAME.registerComponent('touch-controls', {
-    schema: {
-      speed: {type: 'number', default: 0.5},
-      zoomSpeed: {type: 'number', default: 0.005},
-      minScale: {type: 'number', default: 0.5},
-      maxScale: {type: 'number', default: 2}
-    },
-    init: function() {
-      this.handleTouchMove = this.handleTouchMove.bind(this);
-      this.handleTouchEnd = this.handleTouchEnd.bind(this);
-      this.startTouches = [];
-      this.lastScale = 1;
-    },
-    handleTouchStart: function(evt) {
-      this.startTouches = evt.touches;
-    },
-    handleTouchMove: function(evt) {
-      evt.preventDefault();
-      if (evt.touches.length === 1 && this.startTouches.length === 1) {
-        // Drehen
-        let deltaX = evt.touches[0].pageX - this.startTouches[0].pageX;
-        let deltaY = evt.touches[0].pageY - this.startTouches[0].pageY;
-        this.el.object3D.rotation.y -= deltaX * this.data.speed * 0.01;
-        this.el.object3D.rotation.x -= deltaY * this.data.speed * 0.01;
-      } else if (evt.touches.length === 2 && this.startTouches.length === 2) {
-        // Zoomen
-        let currentDistance = this.getDistance(evt.touches[0], evt.touches[1]);
-        let startDistance = this.getDistance(this.startTouches[0], this.startTouches[1]);
-        let scale = currentDistance / startDistance;
-        this.scaleObject(scale / this.lastScale);
-        this.lastScale = scale;
-      }
-      this.startTouches = evt.touches;
-    },
-    handleTouchEnd: function(evt) {
-      if (evt.touches.length < 2) {
-        this.lastScale = 1;
-      }
-    },
-    getDistance: function(touch1, touch2) {
-      var dx = touch1.pageX - touch2.pageX;
-      var dy = touch1.pageY - touch2.pageY;
-      return Math.sqrt(dx * dx + dy * dy);
-    },
-    scaleObject: function(scaleFactor) {
-      let scale = this.el.object3D.scale.clone().multiplyScalar(scaleFactor);
-      scale.x = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.x));
-      scale.y = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.y));
-      scale.z = Math.max(this.data.minScale, Math.min(this.data.maxScale, scale.z));
-      this.el.object3D.scale.set(scale.x, scale.y, scale.z);
-    },
-    update: function() {
-      this.el.addEventListener('touchmove', this.handleTouchMove);
-      window.addEventListener('touchend', this.handleTouchEnd);
-      this.el.addEventListener('touchstart', (evt) => this.handleTouchStart(evt));
-    },
-    remove: function() {
-      this.el.removeEventListener('touchmove', this.handleTouchMove);
-      window.removeEventListener('touchend', this.handleTouchEnd);
-      this.el.removeEventListener('touchstart', this.handleTouchStart);
-    }
-  });
-</script>
+    <script>
+      AFRAME.registerComponent('cursor-drag-rotate', {
+        schema: {
+          speed: {type: 'number', default: 1}, // Geschwindigkeit der Drehung
+          zoomSpeed: {type: 'number', default: 0.1}, // Geschwindigkeit des Zooms
+          minScale: {type: 'number', default: 1.0}, // Minimale Skalierung
+          maxScale: {type: 'number', default: 2.0} // Maximale Skalierung
+        },
+        init: function() {
+          this.isMouseDown = false;
+          this.isTouching = false;
+          this.startX = 0;
+          this.startY = 0;
+          this.lastClickTime = 0;
+          const el = this.el;
+          const data = this.data;
+
+          el.addEventListener('mouseenter', () => this.isMouseOver = true);
+          el.addEventListener('mouseleave', () => this.isMouseOver = false);
+
+          window.addEventListener('mousedown', (event) => {
+            if (this.isMouseOver) {
+              this.isMouseDown = true;
+              this.startX = event.clientX;
+              this.startY = event.clientY;
+            }
+          });
+
+          window.addEventListener('mousemove', (event) => {
+            if (this.isMouseDown && this.isMouseOver) {
+              this.rotateElement(event.clientX, event.clientY);
+            }
+          });
+
+          window.addEventListener('mouseup', () => this.isMouseDown = false);
+
+          el.addEventListener('touchstart', (event) => {
+            this.isTouching = true;
+            this.startX = event.touches[0].clientX;
+            this.startY = event.touches[0].clientY;
+          }, false);
+
+          el.addEventListener('touchmove', (event) => {
+            if (this.isTouching) {
+              const touchX = event.touches[0].clientX;
+              const touchY = event.touches[0].clientY;
+              this.rotateElement(touchX, touchY);
+            }
+          }, false);
+
+          el.addEventListener('touchend', () => {
+            this.isTouching = false;
+          }, false);
+
+          this.rotateElement = function(clientX, clientY) {
+            let diffX = clientX - this.startX;
+            let diffY = clientY - this.startY;
+            this.startX = clientX;
+            this.startY = clientY;
+            
+            let rotation = el.getAttribute('rotation');
+            rotation.y += diffX * data.speed;
+            rotation.x -= diffY * data.speed;
+            el.setAttribute('rotation', rotation);
+          };
+
+          el.addEventListener('click', () => {
+            const currentTime = new Date().getTime();
+            if (currentTime - this.lastClickTime < 500) {
+              el.setAttribute('rotation', {x: 0, y: 0, z: 0});
+              el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
+            }
+            this.lastClickTime = currentTime;
+          });
+
+          window.addEventListener('wheel', (event) => {
+            if (this.isMouseOver) {
+              let scale = el.getAttribute('scale');
+              let zoomFactor = event.deltaY * -data.zoomSpeed;
+              scale.x = Math.max(data.minScale, Math.min(data.maxScale, scale.x + zoomFactor));
+              scale.y = Math.max(data.minScale, Math.min(data.maxScale, scale.y + zoomFactor));
+              scale.z = Math.max(data.minScale, Math.min(data.maxScale, scale.z + zoomFactor));
+              el.setAttribute('scale', scale);
+            }
+          });
+        }
+      });
+    </script>
 </head>
 <body>
     <a-scene>
-      <a-box id="interactive-box" position="0 1.5 -5" rotation="0 0 0" color="#4CC3D9" touch-controls></a-box>
-      <a-entity camera look-controls="false" position="0 1.6 0">
+      <a-box position="0 1.5 -5" rotation="0 0 0" color="#4CC3D9" cursor-drag-rotate="speed: 0.1; zoomSpeed: 0.05; minScale: 1.0; maxScale: 2.0"></a-box>
+        <a-entity camera look-controls="false" position="0 1.6 0">
           <a-cursor id="cursor" color="red" fuse="false"></a-cursor>
         </a-entity>
     </a-scene>
