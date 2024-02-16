@@ -2,105 +2,60 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>A-Frame Scene with Object Orbit Component</title>
+    <title>A-Frame Scene with Enhanced Touch Interaction</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script>
-      AFRAME.registerComponent('cursor-drag-rotate', {
+      AFRAME.registerComponent('enhanced-touch-rotate', {
         schema: {
-          speed: {type: 'number', default: 1}, // Geschwindigkeit der Drehung
-          zoomSpeed: {type: 'number', default: 0.1}, // Geschwindigkeit des Zooms
-          minScale: {type: 'number', default: 1.0}, // Minimale Skalierung
-          maxScale: {type: 'number', default: 2.0} // Maximale Skalierung
+          speed: {type: 'number', default: 1} // Geschwindigkeit der Drehung
         },
         init: function() {
-          this.isMouseDown = false;
-          this.isTouching = false;
+          this.handleTouchMove = this.handleTouchMove.bind(this);
           this.startX = 0;
           this.startY = 0;
-          this.lastClickTime = 0;
-          const el = this.el;
-          const data = this.data;
-
-          el.addEventListener('mouseenter', () => this.isMouseOver = true);
-          el.addEventListener('mouseleave', () => this.isMouseOver = false);
-
-          window.addEventListener('mousedown', (event) => {
-            if (this.isMouseOver) {
-              this.isMouseDown = true;
-              this.startX = event.clientX;
-              this.startY = event.clientY;
-            }
-          });
-
-          window.addEventListener('mousemove', (event) => {
-            if (this.isMouseDown && this.isMouseOver) {
-              this.rotateElement(event.clientX, event.clientY);
-            }
-          });
-
-          window.addEventListener('mouseup', () => this.isMouseDown = false);
-
-          el.addEventListener('touchstart', (event) => {
-            event.preventDefault(); // Verhindern des Standardverhaltens
-            this.isTouching = true;
-            this.startX = event.touches[0].clientX;
-            this.startY = event.touches[0].clientY;
-          }, {passive: false}); // Hinweis auf passive Event-Listener
-          
-          el.addEventListener('touchmove', (event) => {
-            event.preventDefault(); // Verhindern des Standardverhaltens
-            if (this.isTouching) {
-              const touchX = event.touches[0].clientX;
-              const touchY = event.touches[0].clientY;
-              this.rotateElement(touchX, touchY);
-            }
-          }, {passive: false});
-          
-          el.addEventListener('touchend', (event) => {
-            this.isTouching = false;
-          }, false);
-
-          this.rotateElement = function(clientX, clientY) {
-            let diffX = clientX - this.startX;
-            let diffY = clientY - this.startY;
-            this.startX = clientX;
-            this.startY = clientY;
-            
-            let rotation = el.getAttribute('rotation');
-            rotation.y += diffX * data.speed;
-            rotation.x -= diffY * data.speed;
-            el.setAttribute('rotation', rotation);
-          };
-
-          el.addEventListener('click', () => {
-            const currentTime = new Date().getTime();
-            if (currentTime - this.lastClickTime < 500) {
-              el.setAttribute('rotation', {x: 0, y: 0, z: 0});
-              el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
-            }
-            this.lastClickTime = currentTime;
-          });
-
-          window.addEventListener('wheel', (event) => {
-            if (this.isMouseOver) {
-              let scale = el.getAttribute('scale');
-              let zoomFactor = event.deltaY * -data.zoomSpeed;
-              scale.x = Math.max(data.minScale, Math.min(data.maxScale, scale.x + zoomFactor));
-              scale.y = Math.max(data.minScale, Math.min(data.maxScale, scale.y + zoomFactor));
-              scale.z = Math.max(data.minScale, Math.min(data.maxScale, scale.z + zoomFactor));
-              el.setAttribute('scale', scale);
-            }
-          });
+          this.isTouching = false;
+        },
+        play: function() {
+          this.el.addEventListener('touchstart', this.handleTouchStart.bind(this));
+          this.el.addEventListener('touchmove', this.handleTouchMove);
+          this.el.addEventListener('touchend', this.handleTouchEnd.bind(this));
+        },
+        pause: function() {
+          this.el.removeEventListener('touchstart', this.handleTouchStart);
+          this.el.removeEventListener('touchmove', this.handleTouchMove);
+          this.el.removeEventListener('touchend', this.handleTouchEnd);
+        },
+        handleTouchStart: function(event) {
+          this.isTouching = true;
+          this.startX = event.touches[0].pageX;
+          this.startY = event.touches[0].pageY;
+        },
+        handleTouchMove: function(event) {
+          if (!this.isTouching) return;
+          event.preventDefault(); // Verhindert Scrollen beim Touch
+          var currentX = event.touches[0].pageX;
+          var currentY = event.touches[0].pageY;
+          var diffX = currentX - this.startX;
+          var diffY = currentY - this.startY;
+          this.startX = currentX;
+          this.startY = currentY;
+          var rotation = this.el.getAttribute('rotation');
+          rotation.y += diffX * this.data.speed;
+          rotation.x -= diffY * this.data.speed;
+          this.el.setAttribute('rotation', rotation);
+        },
+        handleTouchEnd: function(event) {
+          this.isTouching = false;
         }
       });
     </script>
 </head>
 <body>
     <a-scene>
-      <a-box position="0 1.5 -5" rotation="0 0 0" color="#4CC3D9" cursor-drag-rotate="speed: 0.1; zoomSpeed: 0.05; minScale: 1.0; maxScale: 2.0"></a-box>
-        <a-entity camera look-controls="false" position="0 1.6 0">
-          <a-cursor id="cursor" color="red" fuse="false"></a-cursor>
-        </a-entity>
+      <a-box position="0 2 -5" rotation="0 0 0" color="#4CC3D9" enhanced-touch-rotate="speed: 0.5"></a-box>
+      <a-entity camera look-controls position="0 1.6 0">
+        <a-cursor color="red"></a-cursor>
+      </a-entity>
     </a-scene>
 </body>
 </html>
