@@ -48,14 +48,10 @@
         
         window.addEventListener('mouseup', () => this.isMouseDown = false);
         
-        // Doppelklick für Reset
-        el.addEventListener('click', () => {
-          const currentTime = new Date().getTime();
-          if (currentTime - this.lastClickTime < 500) { // Doppelklick-Erkennung
-            el.setAttribute('rotation', {x: 0, y: 0, z: 0});
-            el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
-          }
-          this.lastClickTime = currentTime;
+        // Doppelklick (dblclick) für Reset
+        el.addEventListener('dblclick', () => {
+          el.setAttribute('rotation', {x: 0, y: 0, z: 0});
+          el.setAttribute('scale', {x: 1.0, y: 1.0, z: 1.0});
         });
         
         window.addEventListener('wheel', (event) => {
